@@ -15,12 +15,13 @@ app.use((req, res, next) => {
   req.user = {
     _id: '643336a78cfbff0cbcaf3cee',
   };
-  app.use('/', usersRouter);
-  app.use('/', cardsRouter);
-  app.use('*', (req, res) => {
-    res.status(notFoundError).send({ message: 'Страница не найдена' });
-  });
   next();
+});
+
+app.use('/', usersRouter);
+app.use('/', cardsRouter);
+app.use('*', (req, res) => {
+  res.status(notFoundError).send({ message: 'Страница не найдена' });
 });
 
 app.listen(PORT);
