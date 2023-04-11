@@ -4,7 +4,7 @@ const BadRequestError = require('../errors/BadRequestError');
 const NotFoundError = require('../errors/NotFoundError');
 const ForbiddenError = require('../errors/ForbiddenError');
 
-const getCards = (res, next) => Card.find({})
+const getCards = (req, res, next) => Card.find({})
   .then((cards) => {
     res.status(200).send(cards);
   })
@@ -14,14 +14,12 @@ const createCard = (req, res, next) => {
   const { name, link } = req.body;
   Card.create({ name, link, owner: req.user._id })
     .then((card) => {
-      if (!card) {
-        next(new BadRequestError('Переданы некорректные данные при создании карточки'));
-      }
       res.send({ data: card });
     })
+    // eslint-disable-next-line consistent-return
     .catch((error) => {
       if (error instanceof mongoose.Error.ValidationError) {
-        next(new BadRequestError('Переданы некорректные данные при создании карточки'));
+        return next(new BadRequestError('Переданы некорректные данные при создании карточки'));
       }
       next(error);
     });
@@ -39,9 +37,10 @@ const deleteCard = (req, res, next) => {
       Card.findByIdAndRemove(req.params.cardId)
         .then((removingCard) => res.send(removingCard));
     })
+    // eslint-disable-next-line consistent-return
     .catch((error) => {
       if (error instanceof mongoose.Error.CastError) {
-        next(new BadRequestError('Переданы некорректные данные при удалении карточки'));
+        return next(new BadRequestError('Переданы некорректные данные при удалении карточки'));
       }
       next(error);
     });
@@ -59,9 +58,10 @@ const likeCard = (req, res, next) => {
       }
       return res.send({ data: card });
     })
+    // eslint-disable-next-line consistent-return
     .catch((error) => {
       if (error instanceof mongoose.Error.CastError) {
-        next(new BadRequestError('Переданы некорректные данные'));
+        return next(new BadRequestError('Переданы некорректные данные'));
       }
       next(error);
     });

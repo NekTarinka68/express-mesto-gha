@@ -21,12 +21,14 @@ const login = (req, res, next) => {
         const token = jwt.sign({ _id: user._id }, 'app-secret', {
           expiresIn: '7d',
         });
-        res.send({ jwt: token });
+        res.cookie('jwt', token, {
+          maxAge: 3600000 * 24 * 7,
+          httpOnly: true,
+          sameSite: true,
+        }).send({ jwt: token });
       });
     })
-    .catch((error) => {
-      next(error);
-    });
+    .catch(next);
 };
 
 const createUser = (req, res, next) => {
@@ -39,12 +41,13 @@ const createUser = (req, res, next) => {
     }))
     .then((user) => User.findOne({ _id: user._id }))
     .then((user) => res.status(200).send({ user }))
+    // eslint-disable-next-line consistent-return
     .catch((error) => {
       if (error instanceof mongoose.Error.ValidationError) {
-        next(new BadRequestError('Переданы некорректные данные'));
+        return next(new BadRequestError('Переданы некорректные данные'));
       }
       if (error.code === 11000) {
-        next(new ConflictError('Пользователь с таким email уже зарегистрирован'));
+        return next(new ConflictError('Пользователь с таким email уже зарегистрирован'));
       }
       next(error);
     });
@@ -55,15 +58,16 @@ const getUserId = (req, res, next) => {
     throw new NotFoundError('Пользователь по указанному _id не найден');
   })
     .then((user) => res.send(user))
+    // eslint-disable-next-line consistent-return
     .catch((error) => {
       if (error instanceof mongoose.Error.CastError) {
-        next(new BadRequestError('Переданы некорректные данные'));
+        return next(new BadRequestError('Переданы некорректные данные'));
       }
       next(error);
     });
 };
 
-const getUsers = (res, next) => {
+const getUsers = (req, res, next) => {
   User.find({})
     .then((users) => {
       res.send({ users });
@@ -90,9 +94,10 @@ const updateUser = (req, res, next) => {
       throw new NotFoundError('Пользователь не найден');
     })
     .then((updatedUser) => res.send(updatedUser))
+    // eslint-disable-next-line consistent-return
     .catch((error) => {
       if (error instanceof mongoose.Error.ValidationError) {
-        next(new BadRequestError('Переданы некорректные данные'));
+        return next(new BadRequestError('Переданы некорректные данные'));
       }
       next(error);
     });
@@ -105,9 +110,10 @@ const updateAvatar = (req, res, next) => {
       throw new NotFoundError('Пользователь не найден');
     })
     .then((updatedAvatar) => res.send(updatedAvatar))
+    // eslint-disable-next-line consistent-return
     .catch((error) => {
       if (error instanceof mongoose.Error.ValidationError) {
-        next(new BadRequestError('Переданы некорректные данные.'));
+        return next(new BadRequestError('Переданы некорректные данные.'));
       }
       next(error);
     });
