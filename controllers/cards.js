@@ -1,81 +1,87 @@
 const mongoose = require('mongoose');
 const Card = require('../models/card');
-const { badRequestError, notFoundError, internalServerError } = require('../utils/errors');
+const BadRequestError = require('../errors/BadRequestError');
+const NotFoundError = require('../errors/NotFoundError');
+const ForbiddenError = require('../errors/ForbiddenError');
 
-const getCards = (req, res) => Card.find({})
+const getCards = (res, next) => Card.find({})
   .then((cards) => {
-    res.status(200).send({ cards });
+    res.status(200).send(cards);
   })
-  .catch(() => {
-    res.status(internalServerError).send({ message: 'Ошибка сервера' });
-  });
+  .catch((error) => next(error));
 
-const createCard = (req, res) => {
+const createCard = (req, res, next) => {
   const { name, link } = req.body;
   Card.create({ name, link, owner: req.user._id })
-    .then((card) => res.status(201).send(card))
+    .then((card) => {
+      if (!card) {
+        next(new BadRequestError('Переданы некорректные данные при создании карточки'));
+      }
+      res.send({ data: card });
+    })
     .catch((error) => {
       if (error instanceof mongoose.Error.ValidationError) {
-        res.status(badRequestError).send({ message: 'Переданы некорректные данные при создании карточки' });
-        return;
+        next(new BadRequestError('Переданы некорректные данные при создании карточки'));
       }
-      res.status(internalServerError).send({ message: 'Ошибка сервера' });
+      next(error);
     });
 };
 
-const deleteCard = (req, res) => {
-  Card.findByIdAndRemove(req.params.cardId).orFail()
-    .then((card) => res.send({ data: card }))
+const deleteCard = (req, res, next) => {
+  Card.findById(req.params.cardId)
+    .then((card) => {
+      if (!card) {
+        throw new NotFoundError('Карточка не найдена');
+      }
+      if (card.owner.toHexString() !== req.user._id) {
+        throw new ForbiddenError('Отказано в доступе');
+      }
+      Card.findByIdAndRemove(req.params.cardId)
+        .then((removingCard) => res.send(removingCard));
+    })
     .catch((error) => {
       if (error instanceof mongoose.Error.CastError) {
-        res.status(badRequestError).send({ message: 'Переданы некорректные данные при удалении карточки' });
-        return;
+        next(new BadRequestError('Переданы некорректные данные при удалении карточки'));
       }
-      if (error instanceof mongoose.Error.DocumentNotFoundError) {
-        res.status(notFoundError).send({ message: 'Карточка не найдена' });
-        return;
-      }
-      res.status(internalServerError).send({ message: 'Ошибка сервера' });
+      next(error);
     });
 };
 
-const likeCard = (req, res) => {
+const likeCard = (req, res, next) => {
   Card.findByIdAndUpdate(
     req.params.cardId,
     { $addToSet: { likes: req.user._id } },
     { new: true },
-  ).orFail()
-    .then((card) => res.send(card))
+  )
+    .then((card) => {
+      if (!card) {
+        throw new NotFoundError('Карточка не найдена');
+      }
+      return res.send({ data: card });
+    })
     .catch((error) => {
       if (error instanceof mongoose.Error.CastError) {
-        res.status(badRequestError).send({ message: 'Пользователь не найден' });
-        return;
+        next(new BadRequestError('Переданы некорректные данные'));
       }
-      if (error instanceof mongoose.Error.DocumentNotFoundError) {
-        res.status(notFoundError).send({ message: 'Карточка не найдена' });
-        return;
-      }
-      res.status(internalServerError).send({ message: 'Ошибка сервера' });
+      next(error);
     });
 };
 
-const dislikeCard = (req, res) => {
+const dislikeCard = (req, res, next) => {
   Card.findByIdAndUpdate(
     req.params.cardId,
     { $pull: { likes: req.user._id } },
     { new: true },
-  ).orFail()
+  ).orFail(() => {
+    throw new NotFoundError('Карточка не найдена');
+  })
     .then((card) => res.send(card))
+    // eslint-disable-next-line consistent-return
     .catch((error) => {
       if (error instanceof mongoose.Error.CastError) {
-        res.status(badRequestError).send({ message: 'Пользователь не найден' });
-        return;
+        return next(new BadRequestError('Пользователь не найден'));
       }
-      if (error instanceof mongoose.Error.DocumentNotFoundError) {
-        res.status(notFoundError).send({ message: 'Карточка не найдена' });
-        return;
-      }
-      res.status(internalServerError).send({ message: 'Ошибка сервера' });
+      next(error);
     });
 };
 
